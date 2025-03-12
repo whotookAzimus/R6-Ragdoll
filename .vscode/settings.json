@@ -1,0 +1,14 @@
+{
+    "[lua]": {
+        "editor.defaultFormatter": "JohnnyMorganz.stylua",
+        "editor.formatOnSave": true
+    },
+    "stylua.targetReleaseVersion": "latest",
+    "robloxLsp.completion.callParenthesess": true,
+    "editor.showUnused": false,
+    "robloxLsp.diagnostics.disable": [
+        "unused-local",
+        "undefined-type"
+    ],
+    "todo-tree.tree.scanMode": "workspace only"
+}

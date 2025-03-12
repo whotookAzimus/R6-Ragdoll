@@ -1,0 +1,15 @@
+option ServerOutput = "Network/Server.luau"
+option ClientOutput = "Network/Client.luau"
+
+event Ragdolled {
+	from: Server,
+	type: Reliable,
+	call: SingleAsync,
+	data: boolean
+}
+
+event Ragdoll {
+	from: Client,
+	type: Reliable,
+	call: SingleAsync,
+}
