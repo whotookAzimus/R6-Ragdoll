@@ -148,11 +148,92 @@ local Queue: any = {
     Unreliable = table.create(256)
 }
 
-Queue.Reliable[1] = table.create(256)
+Queue.Unreliable[0] = table.create(256)
+Queue.Reliable[0] = table.create(256)
+Queue.Reliable[3] = table.create(256)
+Queue.Reliable[5] = table.create(256)
+export type SnapshotData = { CFrame: CFrame, Timestamp: number }
+export type Snapshot = {[Player]: { CFrame: CFrame, Timestamp: number }}
+local function ReadEVENT_ClientSendSnapshotData(): ({ CFrame: CFrame, Timestamp: number })
+	-- Read BLOCK: 28 bytes
+	local BLOCK_START = Read(28)
+	local Value = {} :: any
+	local X = buffer.readf32(RecieveBuffer, BLOCK_START + 0)
+	local Y = buffer.readf32(RecieveBuffer, BLOCK_START + 4)
+	local Z = buffer.readf32(RecieveBuffer, BLOCK_START + 8)
+	local Position = Vector3.new(X, Y, Z)
+	local rX = buffer.readf32(RecieveBuffer, BLOCK_START + 12)
+	local rY = buffer.readf32(RecieveBuffer, BLOCK_START + 16)
+	local rZ = buffer.readf32(RecieveBuffer, BLOCK_START + 20)
+	Value.CFrame = CFrame.new(Position) * CFrame.fromOrientation(rX, rY, rZ)
+	Value.Timestamp = buffer.readf32(RecieveBuffer, BLOCK_START + 24)
+	return Value
+end
+
+local function WriteEVENT_ServerSendSnapshot(Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+	-- Allocate BLOCK: 3 bytes
+	local BLOCK_START = Allocate(3)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 1)
+	local Elements_1 = 0
+	for Key_1, Element_1 in Value do
+		Elements_1 += 1
+		table.insert(SendInstances, Key_1 or false :: any)
+		local Vector = Element_1.CFrame.Position
+		local OFFSET_0 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_0, Vector.X)
+		local OFFSET_1 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_1, Vector.Y)
+		local OFFSET_2 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_2, Vector.Z)
+		local rX, rY, rZ = Element_1.CFrame:ToOrientation()
+		local OFFSET_3 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_3, rX)
+		local OFFSET_4 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_4, rY)
+		local OFFSET_5 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_5, rZ)
+		local OFFSET_6 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_6, Element_1.Timestamp)
+	end
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, Elements_1)
+end
+
+local function ReadEVENT_RequestInitialReplicationData(): (nil)
+	return nil
+end
+
+local function WriteEVENT_ReceiveInitialReplicationData(Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+	-- Allocate BLOCK: 3 bytes
+	local BLOCK_START = Allocate(3)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 1)
+	local Elements_1 = 0
+	for Key_1, Element_1 in Value do
+		Elements_1 += 1
+		table.insert(SendInstances, Key_1 or false :: any)
+		local Vector = Element_1.CFrame.Position
+		local OFFSET_0 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_0, Vector.X)
+		local OFFSET_1 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_1, Vector.Y)
+		local OFFSET_2 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_2, Vector.Z)
+		local rX, rY, rZ = Element_1.CFrame:ToOrientation()
+		local OFFSET_3 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_3, rX)
+		local OFFSET_4 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_4, rY)
+		local OFFSET_5 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_5, rZ)
+		local OFFSET_6 = Allocate(4)
+		buffer.writef32(SendBuffer, OFFSET_6, Element_1.Timestamp)
+	end
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, Elements_1)
+end
+
 local function WriteEVENT_Ragdolled(Value: boolean): ()
 	-- Allocate BLOCK: 2 bytes
 	local BLOCK_START = Allocate(2)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 0)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 2)
 	buffer.writeu8(SendBuffer, BLOCK_START + 1, Value and 1 or 0)
 end
 
@@ -160,9 +241,63 @@ local function ReadEVENT_Ragdoll(): (nil)
 	return nil
 end
 
+local function WriteEVENT_Knockback(Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number }): ()
+	-- Allocate BLOCK: 23 bytes
+	local BLOCK_START = Allocate(23)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 4)
+	table.insert(SendInstances, Value.TargetCharacter or false :: any)
+	local Vector = Value.Direction
+	buffer.writef32(SendBuffer, BLOCK_START + 1, Vector.X)
+	buffer.writef32(SendBuffer, BLOCK_START + 5, Vector.Y)
+	buffer.writef32(SendBuffer, BLOCK_START + 9, Vector.Z)
+	buffer.writeu8(SendBuffer, BLOCK_START + 13, Value.Rotation ~= nil and 1 or 0)
+	if Value.Rotation ~= nil then
+		-- Allocate BLOCK: 12 bytes
+		local BLOCK_START = Allocate(12)
+		local Vector = Value.Rotation
+		buffer.writef32(SendBuffer, BLOCK_START + 0, Vector.X)
+		buffer.writef32(SendBuffer, BLOCK_START + 4, Vector.Y)
+		buffer.writef32(SendBuffer, BLOCK_START + 8, Vector.Z)
+	end
+	buffer.writef32(SendBuffer, BLOCK_START + 14, Value.KnockbackPower)
+	buffer.writeu8(SendBuffer, BLOCK_START + 18, Value.RotationPower ~= nil and 1 or 0)
+	if Value.RotationPower ~= nil then
+		-- Allocate BLOCK: 4 bytes
+		local BLOCK_START = Allocate(4)
+		buffer.writef32(SendBuffer, BLOCK_START + 0, Value.RotationPower)
+	end
+	buffer.writef32(SendBuffer, BLOCK_START + 19, Value.Duration)
+end
+
+local function ReadEVENT_AttemptKnockback(): (Model)
+	RecieveInstanceCursor += 1
+	local Value = RecieveInstances[RecieveInstanceCursor]
+	if (not Value) or typeof(Value) ~= "Instance" then error(`Expected an Instance, got {typeof(Value)} instead.`) end
+	if not Value:IsA("Model") then error(`Expected an Instance of type "Model", got "{Value.ClassName}" instead.`) end
+	return Value
+end
+
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
+	ClientSendSnapshotData = {
+		On = NOOP
+	},
+	ServerSendSnapshot = {
+		Fire = NOOP,
+		FireAll = NOOP,
+		FireList = NOOP,
+		FireExcept = NOOP
+	},
+	RequestInitialReplicationData = {
+		On = NOOP
+	},
+	ReceiveInitialReplicationData = {
+		Fire = NOOP,
+		FireAll = NOOP,
+		FireList = NOOP,
+		FireExcept = NOOP
+	},
 	Ragdolled = {
 		Fire = NOOP,
 		FireAll = NOOP,
@@ -170,6 +305,15 @@ if not RunService:IsRunning() then
 		FireExcept = NOOP
 	},
 	Ragdoll = {
+		On = NOOP
+	},
+	Knockback = {
+		Fire = NOOP,
+		FireAll = NOOP,
+		FireList = NOOP,
+		FireExcept = NOOP
+	},
+	AttemptKnockback = {
 		On = NOOP
 	},
 	})
@@ -229,15 +373,35 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 		-- Read BLOCK: 1 bytes
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
-		if Index == 1 then
-			local Value: nil = ReadEVENT_Ragdoll()
-			if Events.Reliable[1] ~= nil then
-				task.spawn(Events.Reliable[1], Player, Value)
+		if Index == 0 then
+			local Value: nil = ReadEVENT_RequestInitialReplicationData()
+			if Events.Reliable[0] ~= nil then
+				task.spawn(Events.Reliable[0], Player, Value)
 			else
-				if #Queue.Reliable[1] > 256 then
+				if #Queue.Reliable[0] > 256 then
+					warn("[Blink]: Event queue of \"RequestInitialReplicationData\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[0], {Player, Value} :: {any})
+			end
+		elseif Index == 3 then
+			local Value: nil = ReadEVENT_Ragdoll()
+			if Events.Reliable[3] ~= nil then
+				task.spawn(Events.Reliable[3], Player, Value)
+			else
+				if #Queue.Reliable[3] > 256 then
 					warn("[Blink]: Event queue of \"Ragdoll\" exceeded 256, did you forget to implement a listener?")
 				end
-				table.insert(Queue.Reliable[1], {Player, Value} :: {any})
+				table.insert(Queue.Reliable[3], {Player, Value} :: {any})
+			end
+		elseif Index == 5 then
+			local Value: Model = ReadEVENT_AttemptKnockback()
+			if Events.Reliable[5] ~= nil then
+				task.spawn(Events.Reliable[5], Player, Value)
+			else
+				if #Queue.Reliable[5] > 256 then
+					warn("[Blink]: Event queue of \"AttemptKnockback\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[5], {Player, Value} :: {any})
 			end
 		end
 	end
@@ -252,6 +416,12 @@ Unreliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instan
 		-- Read BLOCK: 1 bytes
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
+		if Index == 0 then
+			local Value: { CFrame: CFrame, Timestamp: number } = ReadEVENT_ClientSendSnapshotData()
+			if Events.Unreliable[0] ~= nil then
+				task.spawn(Events.Unreliable[0], Player, Value)
+			end
+		end
 	end
 end)
 
@@ -259,6 +429,109 @@ end)
 local Returns = table.freeze({
 	StepReplication = StepReplication,
 
+	ClientSendSnapshotData = {
+		On = function(Listener: (Player: Player, Value: { CFrame: CFrame, Timestamp: number }) -> ()): () -> ()
+			Events.Unreliable[0] = Listener
+			return function (): ()
+				Events.Unreliable[0] = nil
+			end
+		end
+	},
+	ServerSendSnapshot = {
+		Fire = function(Player: Player, Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load()
+			WriteEVENT_ServerSendSnapshot(Value)
+			local Buffer = buffer.create(SendCursor)
+			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+			Unreliable:FireClient(Player, Buffer, SendInstances)
+		end,
+		FireAll = function(Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load()
+			WriteEVENT_ServerSendSnapshot(Value)
+			local Buffer = buffer.create(SendCursor)
+			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+			Unreliable:FireAllClients(Buffer, SendInstances)
+		end,
+		FireList = function(List: {Player}, Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load()
+			WriteEVENT_ServerSendSnapshot(Value)
+			local Buffer = buffer.create(SendCursor)
+			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+			for _, Player in List do
+				Unreliable:FireClient(Player, Buffer, SendInstances)
+			end
+		end,
+		FireExcept = function(Except: Player, Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load()
+			WriteEVENT_ServerSendSnapshot(Value)
+			local Buffer = buffer.create(SendCursor)
+			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Unreliable:FireClient(Player, Buffer, SendInstances)
+			end
+		end,
+	},
+	RequestInitialReplicationData = {
+		On = function(Listener: (Player: Player, Value: nil) -> ()): () -> ()
+			Events.Reliable[0] = Listener
+			for Index, Arguments in Queue.Reliable[0] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[0] = {}
+			return function (): ()
+				Events.Reliable[0] = nil
+			end
+		end
+	},
+	ReceiveInitialReplicationData = {
+		Fire = function(Player: Player, Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_ReceiveInitialReplicationData(Value)
+			PlayersMap[Player] = Save()
+		end,
+		FireAll = function(Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load()
+			WriteEVENT_ReceiveInitialReplicationData(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireList = function(List: {Player}, Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load()
+			WriteEVENT_ReceiveInitialReplicationData(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: {[Player]: { CFrame: CFrame, Timestamp: number }}): ()
+			Load()
+			WriteEVENT_ReceiveInitialReplicationData(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
 	Ragdolled = {
 		Fire = function(Player: Player, Value: boolean): ()
 			Load(PlayersMap[Player])
@@ -307,13 +580,71 @@ local Returns = table.freeze({
 	},
 	Ragdoll = {
 		On = function(Listener: (Player: Player, Value: nil) -> ()): () -> ()
-			Events.Reliable[1] = Listener
-			for Index, Arguments in Queue.Reliable[1] do
+			Events.Reliable[3] = Listener
+			for Index, Arguments in Queue.Reliable[3] do
 				task.spawn(Listener, table.unpack(Arguments))
 			end
-			Queue.Reliable[1] = {}
+			Queue.Reliable[3] = {}
 			return function (): ()
-				Events.Reliable[1] = nil
+				Events.Reliable[3] = nil
+			end
+		end
+	},
+	Knockback = {
+		Fire = function(Player: Player, Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number }): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_Knockback(Value)
+			PlayersMap[Player] = Save()
+		end,
+		FireAll = function(Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number }): ()
+			Load()
+			WriteEVENT_Knockback(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireList = function(List: {Player}, Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number }): ()
+			Load()
+			WriteEVENT_Knockback(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number }): ()
+			Load()
+			WriteEVENT_Knockback(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
+	AttemptKnockback = {
+		On = function(Listener: (Player: Player, Value: Model) -> ()): () -> ()
+			Events.Reliable[5] = Listener
+			for Index, Arguments in Queue.Reliable[5] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[5] = {}
+			return function (): ()
+				Events.Reliable[5] = nil
 			end
 		end
 	},

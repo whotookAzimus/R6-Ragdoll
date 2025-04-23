@@ -1,6 +1,40 @@
 option ServerOutput = "Network/Server.luau"
 option ClientOutput = "Network/Client.luau"
 
+struct SnapshotData {
+	CFrame: CFrame<f32, f32>,
+	Timestamp: f32,
+}
+
+map Snapshot = { [Instance(Player)]: SnapshotData }
+
+event ClientSendSnapshotData {
+	from: Client,
+	type: Unreliable,
+	call: SingleAsync,
+	data: SnapshotData
+}
+
+event ServerSendSnapshot {
+	from: Server,
+	type: Unreliable,
+	call: SingleAsync,
+	data: Snapshot
+}
+
+event RequestInitialReplicationData {
+	from: Client,
+	type: Reliable,
+	call: SingleAsync,
+}
+
+event ReceiveInitialReplicationData {
+	from: Server,
+	type: Reliable,
+	call: SingleAsync,
+	data: Snapshot
+}
+
 event Ragdolled {
 	from: Server,
 	type: Reliable,
@@ -11,5 +45,26 @@ event Ragdolled {
 event Ragdoll {
 	from: Client,
 	type: Reliable,
+	call: SingleAsync
+}
+
+event Knockback {
+	from: Server,
+	type: Reliable,
 	call: SingleAsync,
+	data: struct {
+		TargetCharacter: Instance(Model),
+		Direction: vector,
+		Rotation: vector?,
+		KnockbackPower: f32,
+		RotationPower: f32?,
+		Duration: f32
+	}
+}
+
+event AttemptKnockback {
+	from: Client,
+	type: Reliable,
+	call: SingleAsync,
+	data: Instance(Model)
 }
