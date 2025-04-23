@@ -108,26 +108,4 @@ function RigTypes.GetAttachments(skeletonParent: Instance, scale: number)
 	}
 end
 
-function RigTypes.GetNoCollisions(skeletonFolder: Instance)
-	local list = {}
-
-	local function addPair(name1: string, name2: string)
-		local part1 = skeletonFolder:FindFirstChild(name1)
-		local part2 = skeletonFolder:FindFirstChild(name2)
-
-		if part1 and part2 and part1:IsA("BasePart") and part2:IsA("BasePart") then
-			table.insert(list, { part1 = part1, part2 = part2 })
-		end
-	end
-
-	addPair("Head", "Torso")
-	addPair("Left Arm", "Torso")
-	addPair("Right Arm", "Torso")
-	addPair("Left Leg", "Torso")
-	addPair("Right Leg", "Torso")
-	addPair("Left Leg", "Right Leg")
-
-	return list
-end
-
 return RigTypes

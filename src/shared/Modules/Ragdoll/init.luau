@@ -16,7 +16,6 @@ local camera = workspace.CurrentCamera
 local function CloneBodyPart(part: BasePart): BasePart
 	local newPart = (Instance :: any).fromExisting(part)
 	newPart.Transparency = 1
-
 	newPart.CollisionGroup = "Ragdoll"
 	newPart.CanCollide = true
 	newPart.CanTouch = false
@@ -31,7 +30,6 @@ local function CloneBodyPart(part: BasePart): BasePart
 	return newPart
 end
 
--- Activating ragdoll on an arbitrary model with a Humanoid:
 local function ragdoll(character: Model)
 	if not character:IsA("Model") then
 		return
@@ -103,7 +101,6 @@ local function ragdoll(character: Model)
 	local alignPosition = Instance.new("AlignPosition")
 	alignPosition.Enabled = true
 	alignPosition.Attachment1 = rootAttachment
-	-- alignPosition.RigidityEnabled = true
 	alignPosition.MaxForce = 10000
 	alignPosition.Responsiveness = 100
 	alignPosition.ApplyAtCenterOfMass = true
@@ -139,24 +136,14 @@ local function ragdoll(character: Model)
 
 		local constraint = Instance.new("BallSocketConstraint")
 		constraint.Name = "RagdollBallSocketConstraint"
-		constraint.Attachment0 = data.a0
-		constraint.Attachment1 = data.a1
 		constraint.LimitsEnabled = true
-		constraint.UpperAngle = data.limits.UpperAngle
 		constraint.TwistLimitsEnabled = true
+		constraint.UpperAngle = data.limits.UpperAngle
 		constraint.TwistLowerAngle = data.limits.TwistLowerAngle
 		constraint.TwistUpperAngle = data.limits.TwistUpperAngle
+		constraint.Attachment0 = data.a0
+		constraint.Attachment1 = data.a1
 		constraint.Parent = skeletonPart
-	end
-
-	-- Instantiate NoCollisionConstraints:
-	local parts = RigTypes.GetNoCollisions(skeletonFolder)
-	for _, objects in parts do
-		local constraint = Instance.new("NoCollisionConstraint")
-		constraint.Name = "RagdollNoCollisionConstraint"
-		constraint.Part0 = objects.part1
-		constraint.Part1 = objects.part2
-		constraint.Parent = objects.part1
 	end
 
 	local moveConnection = RunService.Heartbeat:Connect(function()
