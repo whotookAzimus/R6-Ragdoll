@@ -150,7 +150,8 @@ local Queue: any = {
 Queue.Unreliable[1] = table.create(256)
 Queue.Reliable[1] = table.create(256)
 Queue.Reliable[2] = table.create(256)
-Queue.Reliable[4] = table.create(256)
+Queue.Reliable[3] = table.create(256)
+Queue.Reliable[5] = table.create(256)
 export type SnapshotData = { CFrame: CFrame, Timestamp: number }
 export type Snapshot = {[Player]: { CFrame: CFrame, Timestamp: number }}
 local function WriteEVENT_ClientSendSnapshotData(Value: { CFrame: CFrame, Timestamp: number }): ()
@@ -245,10 +246,22 @@ local function ReadEVENT_Ragdolled(): (boolean)
 	return Value
 end
 
+local function ReadEVENT_PlayerWasRagdolled(): ({ Player: Player, Ragdolled: boolean })
+	-- Read BLOCK: 1 bytes
+	local BLOCK_START = Read(1)
+	local Value = {} :: any
+	RecieveInstanceCursor += 1
+	Value.Player = RecieveInstances[RecieveInstanceCursor]
+	if (not Value.Player) or typeof(Value.Player) ~= "Instance" then error(`Expected an Instance, got {typeof(Value.Player)} instead.`) end
+	if not Value.Player:IsA("Player") then error(`Expected an Instance of type "Player", got "{Value.Player.ClassName}" instead.`) end
+	Value.Ragdolled = (buffer.readu8(RecieveBuffer, BLOCK_START + 0) == 1)
+	return Value
+end
+
 local function WriteEVENT_Ragdoll(Value: nil): ()
 	-- Allocate BLOCK: 1 bytes
 	local BLOCK_START = Allocate(1)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 3)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 4)
 end
 
 local function ReadEVENT_Knockback(): ({ TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number })
@@ -284,7 +297,7 @@ end
 local function WriteEVENT_AttemptKnockback(Value: Model): ()
 	-- Allocate BLOCK: 1 bytes
 	local BLOCK_START = Allocate(1)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 5)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 6)
 	table.insert(SendInstances, Value or false :: any)
 end
 
@@ -304,6 +317,9 @@ if not RunService:IsRunning() then
 		On = NOOP
 	},
 	Ragdolled = {
+		On = NOOP
+	},
+	PlayerWasRagdolled = {
 		On = NOOP
 	},
 	Ragdoll = {
@@ -379,15 +395,25 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 				end
 				table.insert(Queue.Reliable[2], {Value} :: {any})
 			end
-		elseif Index == 4 then
-			local Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number } = ReadEVENT_Knockback()
-			if Events.Reliable[4] ~= nil then
-				task.spawn(Events.Reliable[4], Value)
+		elseif Index == 3 then
+			local Value: { Player: Player, Ragdolled: boolean } = ReadEVENT_PlayerWasRagdolled()
+			if Events.Reliable[3] ~= nil then
+				task.spawn(Events.Reliable[3], Value)
 			else
-				if #Queue.Reliable[4] > 256 then
+				if #Queue.Reliable[3] > 256 then
+					warn("[Blink]: Event queue of \"PlayerWasRagdolled\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[3], {Value} :: {any})
+			end
+		elseif Index == 5 then
+			local Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number } = ReadEVENT_Knockback()
+			if Events.Reliable[5] ~= nil then
+				task.spawn(Events.Reliable[5], Value)
+			else
+				if #Queue.Reliable[5] > 256 then
 					warn("[Blink]: Event queue of \"Knockback\" exceeded 256, did you forget to implement a listener?")
 				end
-				table.insert(Queue.Reliable[4], {Value} :: {any})
+				table.insert(Queue.Reliable[5], {Value} :: {any})
 			end
 		end
 	end
@@ -463,6 +489,18 @@ local Returns = table.freeze({
 			end
 		end
 	},
+	PlayerWasRagdolled = {
+		On = function(Listener: (Value: { Player: Player, Ragdolled: boolean }) -> ()): () -> ()
+			Events.Reliable[3] = Listener
+			for Index, Arguments in Queue.Reliable[3] do
+				task.spawn(Listener, table.unpack(Arguments))
+			end
+			Queue.Reliable[3] = {}
+			return function (): ()
+				Events.Reliable[3] = nil
+			end
+		end
+	},
 	Ragdoll = {
 		Fire = function(Value: nil): ()
 			WriteEVENT_Ragdoll(Value)
@@ -470,13 +508,13 @@ local Returns = table.freeze({
 	},
 	Knockback = {
 		On = function(Listener: (Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number }) -> ()): () -> ()
-			Events.Reliable[4] = Listener
-			for Index, Arguments in Queue.Reliable[4] do
+			Events.Reliable[5] = Listener
+			for Index, Arguments in Queue.Reliable[5] do
 				task.spawn(Listener, table.unpack(Arguments))
 			end
-			Queue.Reliable[4] = {}
+			Queue.Reliable[5] = {}
 			return function (): ()
-				Events.Reliable[4] = nil
+				Events.Reliable[5] = nil
 			end
 		end
 	},

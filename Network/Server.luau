@@ -150,8 +150,8 @@ local Queue: any = {
 
 Queue.Unreliable[0] = table.create(256)
 Queue.Reliable[0] = table.create(256)
-Queue.Reliable[3] = table.create(256)
-Queue.Reliable[5] = table.create(256)
+Queue.Reliable[4] = table.create(256)
+Queue.Reliable[6] = table.create(256)
 export type SnapshotData = { CFrame: CFrame, Timestamp: number }
 export type Snapshot = {[Player]: { CFrame: CFrame, Timestamp: number }}
 local function ReadEVENT_ClientSendSnapshotData(): ({ CFrame: CFrame, Timestamp: number })
@@ -237,6 +237,14 @@ local function WriteEVENT_Ragdolled(Value: boolean): ()
 	buffer.writeu8(SendBuffer, BLOCK_START + 1, Value and 1 or 0)
 end
 
+local function WriteEVENT_PlayerWasRagdolled(Value: { Player: Player, Ragdolled: boolean }): ()
+	-- Allocate BLOCK: 2 bytes
+	local BLOCK_START = Allocate(2)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 3)
+	table.insert(SendInstances, Value.Player or false :: any)
+	buffer.writeu8(SendBuffer, BLOCK_START + 1, Value.Ragdolled and 1 or 0)
+end
+
 local function ReadEVENT_Ragdoll(): (nil)
 	return nil
 end
@@ -244,7 +252,7 @@ end
 local function WriteEVENT_Knockback(Value: { TargetCharacter: Model, Direction: Vector3, Rotation: Vector3?, KnockbackPower: number, RotationPower: number?, Duration: number }): ()
 	-- Allocate BLOCK: 23 bytes
 	local BLOCK_START = Allocate(23)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 4)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 5)
 	table.insert(SendInstances, Value.TargetCharacter or false :: any)
 	local Vector = Value.Direction
 	buffer.writef32(SendBuffer, BLOCK_START + 1, Vector.X)
@@ -299,6 +307,12 @@ if not RunService:IsRunning() then
 		FireExcept = NOOP
 	},
 	Ragdolled = {
+		Fire = NOOP,
+		FireAll = NOOP,
+		FireList = NOOP,
+		FireExcept = NOOP
+	},
+	PlayerWasRagdolled = {
 		Fire = NOOP,
 		FireAll = NOOP,
 		FireList = NOOP,
@@ -383,25 +397,25 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 				end
 				table.insert(Queue.Reliable[0], {Player, Value} :: {any})
 			end
-		elseif Index == 3 then
+		elseif Index == 4 then
 			local Value: nil = ReadEVENT_Ragdoll()
-			if Events.Reliable[3] ~= nil then
-				task.spawn(Events.Reliable[3], Player, Value)
+			if Events.Reliable[4] ~= nil then
+				task.spawn(Events.Reliable[4], Player, Value)
 			else
-				if #Queue.Reliable[3] > 256 then
+				if #Queue.Reliable[4] > 256 then
 					warn("[Blink]: Event queue of \"Ragdoll\" exceeded 256, did you forget to implement a listener?")
 				end
-				table.insert(Queue.Reliable[3], {Player, Value} :: {any})
+				table.insert(Queue.Reliable[4], {Player, Value} :: {any})
 			end
-		elseif Index == 5 then
+		elseif Index == 6 then
 			local Value: Model = ReadEVENT_AttemptKnockback()
-			if Events.Reliable[5] ~= nil then
-				task.spawn(Events.Reliable[5], Player, Value)
+			if Events.Reliable[6] ~= nil then
+				task.spawn(Events.Reliable[6], Player, Value)
 			else
-				if #Queue.Reliable[5] > 256 then
+				if #Queue.Reliable[6] > 256 then
 					warn("[Blink]: Event queue of \"AttemptKnockback\" exceeded 256, did you forget to implement a listener?")
 				end
-				table.insert(Queue.Reliable[5], {Player, Value} :: {any})
+				table.insert(Queue.Reliable[6], {Player, Value} :: {any})
 			end
 		end
 	end
@@ -578,15 +592,61 @@ local Returns = table.freeze({
 			end
 		end,
 	},
+	PlayerWasRagdolled = {
+		Fire = function(Player: Player, Value: { Player: Player, Ragdolled: boolean }): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_PlayerWasRagdolled(Value)
+			PlayersMap[Player] = Save()
+		end,
+		FireAll = function(Value: { Player: Player, Ragdolled: boolean }): ()
+			Load()
+			WriteEVENT_PlayerWasRagdolled(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireList = function(List: {Player}, Value: { Player: Player, Ragdolled: boolean }): ()
+			Load()
+			WriteEVENT_PlayerWasRagdolled(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: { Player: Player, Ragdolled: boolean }): ()
+			Load()
+			WriteEVENT_PlayerWasRagdolled(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+	},
 	Ragdoll = {
 		On = function(Listener: (Player: Player, Value: nil) -> ()): () -> ()
-			Events.Reliable[3] = Listener
-			for Index, Arguments in Queue.Reliable[3] do
+			Events.Reliable[4] = Listener
+			for Index, Arguments in Queue.Reliable[4] do
 				task.spawn(Listener, table.unpack(Arguments))
 			end
-			Queue.Reliable[3] = {}
+			Queue.Reliable[4] = {}
 			return function (): ()
-				Events.Reliable[3] = nil
+				Events.Reliable[4] = nil
 			end
 		end
 	},
@@ -638,13 +698,13 @@ local Returns = table.freeze({
 	},
 	AttemptKnockback = {
 		On = function(Listener: (Player: Player, Value: Model) -> ()): () -> ()
-			Events.Reliable[5] = Listener
-			for Index, Arguments in Queue.Reliable[5] do
+			Events.Reliable[6] = Listener
+			for Index, Arguments in Queue.Reliable[6] do
 				task.spawn(Listener, table.unpack(Arguments))
 			end
-			Queue.Reliable[5] = {}
+			Queue.Reliable[6] = {}
 			return function (): ()
-				Events.Reliable[5] = nil
+				Events.Reliable[6] = nil
 			end
 		end
 	},

@@ -42,6 +42,16 @@ event Ragdolled {
 	data: boolean
 }
 
+event PlayerWasRagdolled {
+	from: Server,
+	type: Reliable,
+	call: SingleAsync,
+	data: struct {
+		Player: Instance(Player),
+		Ragdolled: boolean
+	}
+}
+
 event Ragdoll {
 	from: Client,
 	type: Reliable,
